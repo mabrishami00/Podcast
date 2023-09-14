@@ -1,23 +1,31 @@
 import xml.etree.ElementTree as ET
 import requests
-from rss.models import Channel, Podcast
+from rss.models import Channel, Podcast, Category
 from datetime import datetime
-
+from django.db import transaction
 
 def parser_for_rss_podcast(feed, channel_type):
     namespaces = {"itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd"}
     response = requests.get(feed)
     root = ET.fromstring(response.text)
     channel = root.find("channel")
-    channel_info = parse_channel(channel, namespaces)
+    channel_info, channel_category = parse_channel(channel, namespaces)
     channel_info["url"] = feed
-    channel_info["channel_type"] = channel_type
+    channel_info["channel_type"] = channel_type[0]
     items_info = parse_podcasts(channel, namespaces)
-    create_channel_and_podcasts(channel_info, items_info)
+    create_channel_and_podcasts(channel_category, channel_info, items_info)
 
-
-def create_channel_and_podcasts(channel_info, items_info):
-    channel, created = Channel.objects.get_or_create(**channel_info)
+@transaction.atomic
+def create_channel_and_podcasts(channel_category, channel_info, items_info):
+    categories = [
+        Category(title=category)
+        for category in channel_category
+        if not Category.objects.filter(title=category).exists()
+    ]
+    categories = Category.objects.bulk_create(categories)
+    channel, created = Channel.objects.get_or_create(url=channel_info.get("url"), defaults=channel_info)
+    channel.categories.set(categories)
+    channel.save()
     podcasts = [
         Podcast(**item, channel=channel)
         for item in items_info
@@ -53,7 +61,7 @@ def parse_channel(channel, namespaces):
         "image_url": channel_image_url,
     }
 
-    return channel_info
+    return channel_info, channel_categories
 
 
 def parse_podcasts(channel, namespaces):
@@ -71,7 +79,11 @@ def parse_podcasts(channel, namespaces):
         item_image_url = item.find("itunes:image", namespaces=namespaces)
         item_audio_url = item.find("enclosure")
 
-        if return_text_or_none(item_guid) and return_text_or_none(item_title) and return_attrib_or_none(item_audio_url, "url"):
+        if (
+            return_text_or_none(item_guid)
+            and return_text_or_none(item_title)
+            and return_attrib_or_none(item_audio_url, "url")
+        ):
             items_info.append(
                 {
                     "guid": return_text_or_none(item_guid),
@@ -80,12 +92,13 @@ def parse_podcasts(channel, namespaces):
                     "author": return_text_or_none(item_author),
                     "duration": return_text_or_none(item_duration),
                     "explicit": explicit_converter(return_text_or_none(item_explicit)),
-                    "pub_date": convert_str_to_datetime(return_text_or_none(item_pub_date)),
+                    "pub_date": convert_str_to_datetime(
+                        return_text_or_none(item_pub_date)
+                    ),
                     "image_url": return_attrib_or_none(item_image_url, "href"),
                     "audio_url": return_attrib_or_none(item_audio_url, "url"),
                 }
             )
-
 
     return items_info
 
@@ -110,6 +123,7 @@ def convert_str_to_datetime(date_string):
         return datetime.strptime(date_string, date_format)
     except:
         return None
+
 
 def explicit_converter(value):
     if value is None:
