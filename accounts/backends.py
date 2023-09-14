@@ -71,3 +71,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
 
         return refresh_token, jti, exp_seconds
 
+    @classmethod
+    def get_token_form_header(cls, token):
+        token = token.replace("Bearer", "").replace(" ", "")
+        return token
