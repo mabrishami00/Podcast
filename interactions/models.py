@@ -19,3 +19,11 @@ class Like(models.Model):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
 
+
+class Subscribe(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_subscribed = models.BooleanField(default=True)
+
+
