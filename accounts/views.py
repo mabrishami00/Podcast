@@ -119,3 +119,36 @@ class UserLogoutView(APIView):
 
         return Response({"message": "logged out successfully!"})
 
+class ObtainNewAccessToken(APIView):
+    """
+    API view for obtaining a new access token using a refresh token.
+
+    This view allows users to obtain a new access token using their refresh token.
+
+    HTTP Methods: POST
+    """
+
+    authentication_classes = []
+
+    def post(self, request):
+        """
+        Handle POST requests for obtaining a new access token using a refresh token.
+
+        Parameters:
+            request (HttpRequest): The HTTP request object containing the refresh token.
+
+        Returns:
+            Response: A JSON response containing a new access token and refresh token.
+        """
+        refresh_token = request.POST.get("refresh").encode("utf-8")
+        payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=["HS256"])
+        jti = payload.get("jti")
+        cache.get(jti)
+        user_id = payload.get("user_id")
+        user = User.objects.get(id=user_id)
+        cache.delete(jti)
+        access_token = JWTAuthentication.generate_access_token(user)
+        refresh_token, jti, exp_seconds = JWTAuthentication.generate_refresh_token(user)
+        cache.set(jti, 0, exp_seconds)
+        return Response({"access_token": access_token, "refresh_token": refresh_token})
+
