@@ -1,8 +1,8 @@
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-
-
+from accounts.models import User
+from rss.models import Channel
 # Create your models here.
 class Comment(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
