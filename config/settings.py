@@ -37,6 +37,13 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+
+    "accounts.apps.AccountsConfig",
+    "interactions.apps.InteractionsConfig",
+    "rss.apps.RssConfig",
+    
+    "rest_framework",
+    "drf_spectacular",
 ]
 
 MIDDLEWARE = [
