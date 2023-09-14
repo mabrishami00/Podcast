@@ -12,3 +12,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
             "password": {"write_only": True},
             "password2": {"write_only": True},
         }
+    def validate(self, data):
+        if data.get("password") != data.get("password2"):
+            raise serializers.ValidationError("Passwords must be match!")
+        return data
