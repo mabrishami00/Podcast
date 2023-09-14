@@ -52,3 +52,22 @@ class JWTAuthentication(authentication.BaseAuthentication):
             access_token_payload, settings.SECRET_KEY, algorithm="HS256"
         )
         return access_token
+
+    @classmethod
+    def generate_refresh_token(cls, user):
+        exp = datetime.timedelta(days=7)
+
+        refresh_token_payload = {
+            "user_id": user.id,
+            "exp": datetime.datetime.now() + exp,
+            "iat": datetime.datetime.now(),
+            "jti": cls.jti,
+        }
+        refresh_token = jwt.encode(
+            refresh_token_payload, settings.SECRET_KEY, algorithm="HS256"
+        )
+        jti = refresh_token_payload.get("jti")
+        exp_seconds = exp.total_seconds()
+
+        return refresh_token, jti, exp_seconds
+
