@@ -3,19 +3,20 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .serializers import RssSerializer, ChannelSerializer, PodcastSerializer
 from .parser import parser_for_rss_podcast
-from .models import Channel, Podcast 
+from .models import Channel, Podcast
 
 # Create your views here.
 
+
 class RssView(APIView):
+    authentication_classes = []
+
     def get(self, request):
-        url = request.query_params.get('url')
+        url = request.query_params.get("url")
         channel = Channel.objects.get(url=url)
         podcasts = Podcast.objects.filter(channel=channel)
         sr_podcasts = PodcastSerializer(instance=podcasts, many=True)
         return Response(sr_podcasts.data)
-
-
 
     def post(self, request):
         sr_data = RssSerializer(data=request.POST)
