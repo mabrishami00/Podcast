@@ -4,7 +4,7 @@ from django.conf import settings
 import datetime
 import uuid
 from django.core.cache import cache
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from .models import User
 
 
@@ -22,6 +22,8 @@ class JWTAuthentication(authentication.BaseAuthentication):
             payload = jwt.decode(jwt_token, settings.SECRET_KEY, algorithms=["HS256"])
         except jwt.exceptions.InvalidSignatureError:
             raise AuthenticationFailed("Invalid signature")
+        except jwt.exceptions.ExpiredSignatureError:
+            raise NotAuthenticated('Access Token Expired')
         except:
             raise AuthenticationFailed("Invalid token")
 
