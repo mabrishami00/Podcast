@@ -4,6 +4,9 @@ from django.db import models
 class Category(models.Model):
     title = models.CharField(max_length=100)
 
+    def __str__(self):
+        return self.title
+
 
 class Channel(models.Model):
     CHANNEL_TYPES = [
@@ -21,6 +24,10 @@ class Channel(models.Model):
     image_url = models.URLField(max_length=500, null=True, blank=True)
     categories = models.ManyToManyField(Category, blank=True)
 
+    def __str__(self):
+        return self.title
+
+
 class Podcast(models.Model):
     guid = models.CharField(max_length=255, unique=True)
     title = models.CharField(max_length=200)
@@ -32,3 +39,6 @@ class Podcast(models.Model):
     image_url = models.URLField(max_length=500, null=True, blank=True)
     audio_url = models.URLField(max_length=500)
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.title} | {self.channel}"
