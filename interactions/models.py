@@ -13,3 +13,9 @@ class Comment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class Like(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
+
