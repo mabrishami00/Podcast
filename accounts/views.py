@@ -152,3 +152,12 @@ class ObtainNewAccessToken(APIView):
         cache.set(jti, 0, exp_seconds)
         return Response({"access_token": access_token, "refresh_token": refresh_token})
 
+class SpectacularSwaggerView(SpectacularSwaggerView):
+    authentication_classes = []
+
+class SpectacularRedocView(SpectacularRedocView):
+    authentication_classes = []
+
+class SpectacularAPIView(SpectacularAPIView):
+    authentication_classes = []
+
