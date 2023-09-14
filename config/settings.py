@@ -144,3 +144,9 @@ CACHES = {
     }
 }
 
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Rss feed aggregator',
+    'DESCRIPTION': 'Parse rss feeds',
+    'VERSION': '1.0.0',
+}
