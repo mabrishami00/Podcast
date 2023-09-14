@@ -6,6 +6,7 @@ from django.conf import settings
 from rest_framework import views, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import status
 
 from accounts.serializers import UserLoginSerializer, UserRegisterSerializer
 from accounts.backends import JWTAuthentication
@@ -141,11 +142,21 @@ class ObtainNewAccessToken(APIView):
             Response: A JSON response containing a new access token and refresh token.
         """
         refresh_token = request.POST.get("refresh").encode("utf-8")
-        payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=["HS256"])
-        jti = payload.get("jti")
-        cache.get(jti)
-        user_id = payload.get("user_id")
-        user = User.objects.get(id=user_id)
+        try:
+            payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=["HS256"])
+            jti = payload.get("jti")
+        except:
+            return Response({"message": "Invalid refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if cache.get(jti) is None:
+            return Response({"message": "Refresh token has been expired!"}, status==status.HTTP_404_NOT_FOUND)
+        
+        try:
+            user_id = payload.get("user_id")
+            user = User.objects.get(id=user_id)
+        except:
+            return Response({"message": "User not found!"}, status==status.HTTP_404_NOT_FOUND)
+
         cache.delete(jti)
         access_token = JWTAuthentication.generate_access_token(user)
         refresh_token, jti, exp_seconds = JWTAuthentication.generate_refresh_token(user)
