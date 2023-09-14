@@ -91,3 +91,31 @@ class UserLoginView(APIView):
 
         return Response({"access_token": access_token, "refresh_token": refresh_token})
 
+class UserLogoutView(APIView):
+    """
+    API view for user logout.
+
+    This view allows users to log out, invalidating their refresh token.
+
+    HTTP Methods: POST
+    """
+
+    def post(self, request):
+        """
+        Handle POST requests for user logout.
+
+        Parameters:
+            request (HttpRequest): The HTTP request object containing the refresh token payload.
+
+        Returns:
+            Response: A JSON response indicating successful or unsuccessful logout.
+        """
+        payload = request.auth
+        try:
+            jti = payload.get("jti")
+            cache.delete(jti)
+        except:
+            return Response({"message": "logged out before!"})
+
+        return Response({"message": "logged out successfully!"})
+
