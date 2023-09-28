@@ -1,0 +1,64 @@
+services:
+  backend:
+    build: .
+    container_name: django
+    env_file:
+      - .env
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    ports: 
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    networks:
+      - main
+    restart: always
+  db:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_DB: rss
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 5412
+    ports:
+      - "5432:5432"
+    networks:
+      - main
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+  
+  redis:
+    image: redis:6
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - main
+    volumes:
+      - redis_data:/data
+    restart: always
+
+  celery:
+    build: .
+    container_name: celery_worker
+    command: celery -A config worker --loglevel=info
+    depends_on:
+      - backend
+      - redis
+    volumes:
+      - .:/app
+    networks:
+      - main
+    restart: always
+
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  main:
+    driver: bridge 
