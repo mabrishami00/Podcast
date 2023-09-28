@@ -6,4 +6,6 @@ app_name = "rss"
 
 urlpatterns = [
     path("", views.RssView.as_view(), name="rss_reader"),
+    path("check/", views.CheckWorkerJobView.as_view(), name="check_worker_job"),
+
 ]
