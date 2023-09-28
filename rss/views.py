@@ -49,3 +49,18 @@ class RssView(APIView):
             return Response(
                 "This is not a valid url!", status=status.HTTP_400_BAD_REQUEST
             )
+class CheckWorkerJobView(APIView):
+    authentication_classes = []
+
+    def get(self, request):
+        task_id = request.query_params.get("task_id")
+        result = AsyncResult(task_id)
+        result_state = result.state
+        if result.ready():
+            if result_state == "FAILURE":
+                return Response(result_state, status=status.HTTP_400_BAD_REQUEST)
+            elif result.state == "SUCCESS":
+                return Response(result_state, status=status.HTTP_201_CREATED)
+        else:
+            return Response(result_state, status=status.HTTP_102_PROCESSING)
+
