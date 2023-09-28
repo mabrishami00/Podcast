@@ -1,0 +1,2 @@
+class NotValidXML(Exception):
+    pass
