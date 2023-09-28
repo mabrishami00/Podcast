@@ -49,6 +49,8 @@ class RssView(APIView):
             return Response(
                 "This is not a valid url!", status=status.HTTP_400_BAD_REQUEST
             )
+
+
 class CheckWorkerJobView(APIView):
     authentication_classes = []
 
@@ -64,3 +66,13 @@ class CheckWorkerJobView(APIView):
         else:
             return Response(result_state, status=status.HTTP_102_PROCESSING)
 
+
+class RecommendationView(APIView):
+    def get(self, request):
+        user = request.user
+        most_liked_channels = (
+            Like.objects.filter(user=user)
+            .values("channel_id")
+            .annotate(count=Count("id"))
+        )
+        return Response(most_liked_channels)
