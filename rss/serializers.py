@@ -3,8 +3,7 @@ from .models import Channel, Podcast
 
 
 class RssSerializer(serializers.Serializer):
-    url = serializers.CharField()
-    channel_type = serializers.CharField()
+    url = serializers.URLField()
 
 
 class ChannelSerializer(serializers.ModelSerializer):
