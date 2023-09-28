@@ -10,6 +10,7 @@ from rest_framework import status
 
 from accounts.serializers import UserLoginSerializer, UserRegisterSerializer
 from accounts.backends import JWTAuthentication
+
 from drf_spectacular.views import SpectacularSwaggerView, SpectacularAPIView, SpectacularRedocView
 import jwt
 
@@ -158,8 +159,9 @@ class ObtainNewAccessToken(APIView):
             return Response({"message": "User not found!"}, status==status.HTTP_404_NOT_FOUND)
 
         cache.delete(jti)
-        access_token = JWTAuthentication.generate_access_token(user)
-        refresh_token, jti, exp_seconds = JWTAuthentication.generate_refresh_token(user)
+        instance = JWTAuthentication()
+        access_token = instance.generate_access_token(user)
+        refresh_token, jti, exp_seconds = instance.generate_refresh_token(user)
         cache.set(jti, 0, exp_seconds)
         return Response({"access_token": access_token, "refresh_token": refresh_token})
 
