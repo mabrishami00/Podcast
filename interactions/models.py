@@ -24,6 +24,14 @@ class Like(models.Model):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
 
+    @staticmethod
+    def is_liked(user, content_object):
+        return Like.objects.filter(user=user, content_object=content_object)
+
+    @staticmethod
+    def count_like(content_object):
+        return Like.objects.filter(content_object=content_object).count()
+
     def __str__(self):
         return self.user
 
@@ -33,6 +41,14 @@ class Subscribe(models.Model):
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     is_subscribed = models.BooleanField(default=True)
+
+    @staticmethod
+    def is_subscribed(user, content_object):
+        return Subscribe.objects.filter(user=user, content_object=content_object)
+
+    @staticmethod
+    def count_subscribed(content_object):
+        return Subscribe.objects.filter(content_object=content_object).count()
 
     def __str__(self):
         return f"{self.user} | {self.channel}"
@@ -44,6 +60,14 @@ class Bookmark(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
+
+    @staticmethod
+    def is_bookmarked(user, content_object):
+        return Bookmark.objects.filter(user=user, content_object=content_object)
+
+    @staticmethod
+    def count_bookmarked(content_object):
+        return Bookmark.objects.filter(content_object=content_object).count()
 
     def __str__(self):
         return self.user
