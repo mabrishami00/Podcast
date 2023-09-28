@@ -17,15 +17,21 @@ class RssView(APIView):
     authentication_classes = []
 
     def get(self, request):
-        url = request.query_params.get("url")
-        channel = Channel.objects.get(url=url)
+        try:
+            url = request.query_params.get("url")
+            channel = Channel.objects.get(url=url)
+        except:
+            channel = Channel.objects.last()
+            print(channel)
+            print(type(channel))
+            print("hey")
         results = (
             Podcast.objects.filter(channel=channel)
             if channel.channel_type == "p"
             else News.objects.filter(channel=channel)
         )
 
-        sr_podcasts = PodcastSerializer(instance=podcasts, many=True)
+        sr_podcasts = PodcastSerializer(instance=results, many=True)
         return Response(sr_podcasts.data)
 
     def post(self, request):
