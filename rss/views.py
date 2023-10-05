@@ -14,17 +14,12 @@ from celery.result import AsyncResult
 
 
 class RssView(APIView):
-    authentication_classes = []
-
     def get(self, request):
         try:
             url = request.query_params.get("url")
             channel = Channel.objects.get(url=url)
         except:
             channel = Channel.objects.last()
-            print(channel)
-            print(type(channel))
-            print("hey")
         results = (
             Podcast.objects.filter(channel=channel)
             if channel.channel_type == "p"
@@ -82,3 +77,5 @@ class RecommendationView(APIView):
             .annotate(count=Count("id"))
         )
         return Response(most_liked_channels)
+
+    

@@ -13,7 +13,10 @@ class JWTAuthentication(authentication.BaseAuthentication):
 
     def authenticate(self, request, username=None, password=None):
         authorization_header = request.headers.get("Authorization")
-        jwt_token = JWTAuthentication.get_token_form_header(authorization_header)
+        try:
+            jwt_token = JWTAuthentication.get_token_form_header(authorization_header)
+        except:
+            raise AuthenticationFailed("You are not logged in!")
 
         if jwt_token is None:
             return None
@@ -46,7 +49,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
     def generate_access_token(self, user):
         access_token_payload = {
             "user_id": user.id,
-            "exp": datetime.datetime.now() + datetime.timedelta(days=0, minutes=5),
+            "exp": datetime.datetime.now() + datetime.timedelta(days=1),
             "iat": datetime.datetime.now(),
             "jti": self.jti,
         }
