@@ -68,7 +68,23 @@ class CheckWorkerJobView(APIView):
             return Response(result_state, status=status.HTTP_102_PROCESSING)
 
 
-class RecommendationView(APIView):
+class GetAllChannelsView(APIView):
+    authentication_classes = []
+
+    def get(self, request, *args, **kwargs):
+        searched = request.GET.get("searched")
+        if searched:
+            channels = Channel.objects.filter(
+                Q(title__icontains=searched) | Q(description__icontains=searched)
+            )
+        else:
+            channels = Channel.objects.all()
+        paginator = CustomPagination()
+        paginated_queryset = paginator.paginate_queryset(channels, request)
+        serializer = ChannelSerializer(instance=paginated_queryset, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+
     def get(self, request):
         user = request.user
         most_liked_channels = (
