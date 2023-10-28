@@ -104,14 +104,17 @@ class GetPodcastsView(APIView):
             )
 
 
+class RecommendationPodcastView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         user = request.user
-        most_liked_channels = (
-            Like.objects.filter(user=user)
-            .values("channel_id")
-            .annotate(count=Count("id"))
-        )
-        return Response(most_liked_channels)
-
-    
+        categories = [
+            rp.category
+            for rp in RecommendationPodcast.objects.filter(user=user).order_by(
+                "-score"
+            )[:3]
+        ]
+        channels = Channel.objects.filter(categories__in=categories)[:5]
+        sr_data = ChannelSerializer(instance=channels, many=True)
+        return Response(sr_data.data, status=status.HTTP_200_OK)
