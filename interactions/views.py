@@ -205,3 +205,14 @@ class CommentItemView(APIView):
             return Response(_("comment is not valid!"), status=status.HTTP_400_BAD_REQUEST)
 
 
+class ShowCommentItemView(APIView):
+    authentication_classes = []
+
+    def get(self, request, channel_pk, item_pk):
+        user = request.user
+        model_type = get_model_type_of_channel(channel_pk, item_pk)
+        content_type = ContentType.objects.get(model=model_type)
+        comments = Comment.objects.filter(content_type=content_type, object_id=item_pk)
+        sr_data = CommentSerializer(instance=comments, many=True)
+        return Response(sr_data.data, status=status.HTTP_200_OK)
+
