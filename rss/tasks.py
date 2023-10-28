@@ -57,3 +57,10 @@ def task_after_publish_handler(sender=None, headers=None, body=None, **kwargs):
     print("end after publish")
 
 
+@signals.task_prerun.connect
+def task_prerun_handler(task_id=None, task=None, **kwargs):
+    task_id = task_id
+    task_name = task.name
+    body_log = body_for_logger_celery(task_name, "Task is going to be executed!")
+    logger.info(json.dumps(body_log))
+
