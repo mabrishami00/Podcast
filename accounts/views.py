@@ -223,6 +223,36 @@ class PasswordResetView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class PasswordResetConfirmView(APIView):
+    authentication_classes = []
+
+    def get(self, request, uidb64, token, *args, **kwargs):
+        try:
+            uid = urlsafe_base64_decode(uidb64).decode()
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+
+        if user and default_token_generator.check_token(user, token):
+            password = generate_random_password()
+            user.set_password(password)
+            user.save()
+
+            recipient_list = [user.email]
+            subject = "Your New Password"
+            message = f"Your new password is: {password}"
+
+            sending_email(recipient_list, subject, message)
+
+            return Response(
+                _(
+                    "New password has been sent to your email. Change it as soon as possible!"
+                ),
+                status=status.HTTP_200_OK,
+            )
+        else:
+            return Response(_("Invalid token."), status=status.HTTP_400_BAD_REQUEST)
+
 
 class SpectacularSwaggerView(SpectacularSwaggerView):
     authentication_classes = []
