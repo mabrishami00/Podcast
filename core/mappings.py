@@ -15,3 +15,15 @@ mapping_middleware = {
     },
 }
 
+mapping_rabbitmq = {
+    "mappings": {
+        "properties": {
+            "user_id": {"type": "integer"},
+            "activity": {"type": "text"},
+            "message_type": {"type": "keyword"},
+            "log_level": {"type": "text"},
+            "timestamp": {"type": "date"},
+        }
+    },
+}
+
