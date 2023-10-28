@@ -1,14 +1,21 @@
 from django.shortcuts import render
 from django.db.models import Count
+from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
+from django.utils.translation import gettext as _
+
 
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
+from rest_framework import permissions
 
 from .serializers import RssSerializer, ChannelSerializer, PodcastSerializer
 from .parser import parser_for_rss_podcast
-from .models import Channel, Podcast, News
-from .tasks import parallel_parsing
+from .models import Channel, Podcast, News, Category
+from .tasks import parallel_parsing, update_all_channels
+from interactions.models import Like, RecommendationPodcast
+from core.paginations import CustomPagination
 
 from celery.result import AsyncResult
 
@@ -20,35 +27,35 @@ class RssView(APIView):
             channel = Channel.objects.get(url=url)
         except:
             channel = Channel.objects.last()
-        results = (
-            Podcast.objects.filter(channel=channel)
-            if channel.channel_type == "p"
-            else News.objects.filter(channel=channel)
-        )
-
-        sr_podcasts = PodcastSerializer(instance=results, many=True)
-        return Response(sr_podcasts.data)
+        podcasts = channel.podcast_set.all() if channel.channel_type == "p" else None
+        if podcasts:
+            paginator = CustomPagination()
+            paginated_queryset = paginator.paginate_queryset(podcasts, request)
+            serializer = PodcastSerializer(instance=paginated_queryset, many=True)
+            return paginator.get_paginated_response(serializer.data)
+        else:
+            return Response(_("No such url!"), status=status.HTTP_404_NOT_FOUND)
 
     def post(self, request):
+        user_id = request.user.id
+
         sr_data = RssSerializer(data=request.POST)
         if sr_data.is_valid():
-            print(sr_data.data)
             vd = sr_data.validated_data
             url = vd["url"]
-            result = parallel_parsing.delay(url)
+            result = parallel_parsing.delay(url, user_id)
             task_id = result.task_id
             return Response(task_id, status=status.HTTP_200_OK)
         else:
             url = request.POST.get("url")
             if not url:
-                channels = Channel.objects.all()
-                (parallel_parsing.delay(channel.url) for channel in channels)
+                update_all_channels(user_id)
                 return Response(
                     "All links are going to be updated!",
                     status=status.HTTP_202_ACCEPTED,
                 )
             return Response(
-                "This is not a valid url!", status=status.HTTP_400_BAD_REQUEST
+                _("This is not a valid url!"), status=status.HTTP_400_BAD_REQUEST
             )
 
 
