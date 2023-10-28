@@ -172,6 +172,14 @@ class ShowBookmarkItemView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
+class ShowBookmarkedItemsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        data = get_list_model(Bookmark.list_bookmark, user, "bookmark")
+        return Response(data, status=status.HTTP_200_OK)
+
 
 class CommentItemView(View):
     def post(self, request, channel_pk, item_pk):
