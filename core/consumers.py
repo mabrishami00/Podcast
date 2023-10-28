@@ -90,3 +90,38 @@ class UpdateConsumerCallback(Callback):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
+class UserOperationCallback(Callback):
+    def callback(self, ch, method, properties, body):
+        body_dict = json.loads(body)
+
+        message_type = body_dict.get("message_type")
+        user_id = body_dict.get("user_id")
+
+        body_dict["activity"] = f"{message_type} Task is going to be consumed!"
+        logger.info(json.dumps(body_dict))
+        user = User.objects.get(id=user_id)
+        Notification.objects.create(user=user, message=message_type)
+        obj, created = UserLastActivity.objects.update_or_create(
+            user=user,
+            defaults={"activity": message_type},
+        )
+        email_operation = {
+            "register": "Your account has been registered successfully!",
+            "change_password": "Your password has been changed successfully!",
+        }
+        if message_type in email_operation.keys():
+            recipient = user.email
+            subject = message_type
+            message = email_operation.get(message_type)
+            sender_email = settings.EMAIL_HOST_USER
+
+            send_mail(
+                subject,
+                message,
+                sender_email,
+                [recipient],
+                fail_silently=False,
+            )
+        body_dict["activity"] = f"{message_type} Task consumed successfully!"
+        logger.info(json.dumps(body_dict))
+        ch.basic_ack(delivery_tag=method.delivery_tag)
