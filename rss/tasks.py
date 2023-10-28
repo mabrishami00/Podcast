@@ -1,8 +1,32 @@
-from celery import shared_task
+from django.conf import settings
+
 from .parser import parser_for_rss_podcast
+from .models import Channel
+from core.elasticsearch_logging_handler import ElasticsearchHandler
+
+import logging
+import pytz
+import json
+from celery import signals, group, shared_task, signature, Task
+from elasticsearch import Elasticsearch
+from datetime import datetime
+from core.mappings import mapping_celery
+from .utils import body_for_logger_celery
+
+logger = logging.getLogger("elasticsearch_celery")
+handler = ElasticsearchHandler("celery", mapping_celery)
+logger.addHandler(handler)
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=10)
-def parallel_parsing(self, url):
-    parser_for_rss_podcast(url)
+class BaseTaskWithRetry(Task):
+    autoretry_for = (Exception,)
+    max_retries = 5
+    retry_backoff = 2
+    retry_backoff_max = 100
+    retry_jitter = False
+
+
+@shared_task(bind=True, base=BaseTaskWithRetry)
+def parallel_parsing(self, url, user_id):
+    parser_for_rss_podcast(url, user_id)
 
