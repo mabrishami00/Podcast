@@ -99,6 +99,13 @@ class UnSubscribeItemView(APIView):
         return Response(_("Item has been unsubscribed"), status=status.HTTP_200_OK)
 
 
+class ShowSubscribedItemsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        data = get_list_model(Subscribe.list_subscribe, user, "subscribe")
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class ShowSubscribeItemView(View):
