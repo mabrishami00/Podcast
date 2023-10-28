@@ -48,3 +48,12 @@ def task_before_publish_handler(
     logger.info(json.dumps(body_log))
     print("end before publish")
 
+
+@signals.after_task_publish.connect
+def task_after_publish_handler(sender=None, headers=None, body=None, **kwargs):
+    print("start after publish")
+    body_log = body_for_logger_celery(body[0][0], "Task is published successfully!")
+    logger.info(json.dumps(body_log))
+    print("end after publish")
+
+
