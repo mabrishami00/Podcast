@@ -27,3 +27,14 @@ mapping_rabbitmq = {
     },
 }
 
+
+mapping_celery = {
+    "mappings": {
+        "properties": {
+            "info": {"type": "text"},
+            "activity": {"type": "text"},
+            "log_level": {"type": "text"},
+            "timestamp": {"type": "date"},
+        }
+    }
+}
