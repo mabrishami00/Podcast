@@ -13,10 +13,12 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import environ
 import os
+from celery.schedules import crontab
+from django.utils.translation import gettext_lazy as _
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -26,40 +28,47 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY')
+SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = []
-
+HOST = "http://127.0.0.1:8000"
 
 # Application definition
 
 INSTALLED_APPS = [
+    # django apps
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
+    # my apps
     "accounts.apps.AccountsConfig",
     "interactions.apps.InteractionsConfig",
     "rss.apps.RssConfig",
-    
+    "core.apps.CoreConfig",
+    # third party apps
     "rest_framework",
     "drf_spectacular",
+    "rosetta",
 ]
 
 MIDDLEWARE = [
+    # django middlewares
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # my middlewares
+    "core.middleware.TrackingMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -87,13 +96,13 @@ WSGI_APPLICATION = "config.wsgi.application"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('DB_NAME'),    
-        'USER': env('DB_USER'),      
-        'PASSWORD': env('DB_PASSWORD'), 
-        'HOST': env('DB_HOST'),       
-        'PORT': env('DB_PORT'),             
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("DB_NAME"),
+        "USER": env("DB_USER"),
+        "PASSWORD": env("DB_PASSWORD"),
+        "HOST": env("DB_HOST"),
+        "PORT": env("DB_PORT"),
     }
 }
 
@@ -122,7 +131,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Asia/Tehran"
 
 USE_I18N = True
 
@@ -151,31 +160,105 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 
+# configuration settings for drf
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "accounts.backends.JWTAuthentication",
     ],
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
+
+# configuration for caches(redis)
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": env('REDIS_LOCATION'),
-    }
+        "LOCATION": f'{env("REDIS_LOCATION")}/0',
+    },
+    "rabbitmq_result": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": f'{env("REDIS_LOCATION")}/1',
+    },
 }
 
-
+# configuration for spectacular(for documentation)
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Rss feed aggregator',
-    'DESCRIPTION': 'Parse rss feeds',
-    'VERSION': '1.0.0',
+    "TITLE": "Rss feed aggregator",
+    "DESCRIPTION": "Parse rss feeds",
+    "VERSION": "1.0.0",
 }
 
 
 # Celery configuration
-CELERY_BROKER_URL = env('CELERY_BROKER_URL')  
-CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND')  
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
+CELERY_BROKER_URL = env("CELERY_BROKER_URL")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_ACC_LATE = True
+
+# celery beat configuration
+CELERY_BEAT_SCHEDULE = {
+    "update_all_every_3_hours": {
+        "task": "rss.tasks.update_all_channels",
+        "schedule": crontab(minute=0, hour="*/3"),
+    },
+}
+
+# elasticsearch configuration
+ELASTICSEARCH_CONNECTION = {
+    "hosts": f"http://{env('ELASTICSEARCH_HOST')}:{env('ELASTICSEARCH_PORT')}",
+}
+
+# rabbitmq configuration
+RABBITMQ_USERNAME = env("RABBITMQ_USERNAME")
+RABBITMQ_PASSWORD = env("RABBITMQ_PASSWORD")
+RABBITMQ_HOSTNAME = env("RABBITMQ_HOSTNAME")
+RABBITMQ_PORT = env("RABBITMQ_PORT")
+RABBITMQ_QUEUES = ["update", "user_operations"]
+RABBITMQ_EXCHANGES = ["update", "user_operations"]
+
+# email configuration
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = env("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
+
+
+# logging configuration
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "middleware_handler": {
+            "class": "core.elasticsearch_logging_handler.ElasticsearchHandler",
+            "level": "INFO",
+        },
+        "celery_handler": {
+            "class": "core.elasticsearch_logging_handler.ElasticsearchHandler",
+            "level": "INFO",
+        },
+        "rabbitmq_handler": {
+            "class": "core.elasticsearch_logging_handler.ElasticsearchHandler",
+            "level": "INFO",
+        },
+    },
+    "loggers": {
+        "elasticsearch_middleware": {
+            "level": "INFO",
+            "handler": ["middleware_handler"],
+            "propagate": True,
+        },
+        "elasticsearch_celery": {
+            "level": "INFO",
+            "handler": ["celery_handler"],
+            "propagate": True,
+        },
+        "elasticsearch_rabbitmq": {
+            "level": "INFO",
+            "handler": ["rabbitmq_handler"],
+            "propagate": True,
+        },
+    },
+}
