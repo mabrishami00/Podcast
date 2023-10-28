@@ -1,20 +1,40 @@
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
+from django.core.cache import caches
 from django.contrib.auth import logout
 from django.conf import settings
+from django.contrib.auth.views import PasswordResetView, PasswordResetConfirmView
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes
+from django.utils.translation import gettext_lazy
+
+# from django.core.mail import send_mail
 
 from rest_framework import views, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from accounts.serializers import UserLoginSerializer, UserRegisterSerializer
+from accounts.serializers import (
+    UserLoginSerializer,
+    UserRegisterSerializer,
+    ChangePasswordSerializer,
+    PasswordResetSerializer,
+)
 from accounts.backends import JWTAuthentication
+from core.publishers import NotificationPublisher
+from .utils import generate_random_password, sending_email
+from core.utils import publish_uo_message
 
-from drf_spectacular.views import SpectacularSwaggerView, SpectacularAPIView, SpectacularRedocView
+from drf_spectacular.views import (
+    SpectacularSwaggerView,
+    SpectacularAPIView,
+    SpectacularRedocView,
+)
 import jwt
 
 User = get_user_model()
+
 
 class UserRegisterView(APIView):
     """
@@ -30,6 +50,7 @@ class UserRegisterView(APIView):
     """
 
     serializer_class = UserRegisterSerializer
+    authentication_classes = []
 
     def post(self, request):
         """
@@ -42,9 +63,17 @@ class UserRegisterView(APIView):
             Response: A JSON response indicating the success or failure of the registration.
         """
         serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
+        if serializer.is_valid():
+            serializer.save()
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        username = request.POST.get("username")
+        user_id = User.objects.get(username=username).id
+        publish_uo_message(user_id, f"{username} has been registered!", "register")
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 
 class UserLoginView(APIView):
     """
@@ -86,12 +115,19 @@ class UserLoginView(APIView):
                 {"message": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        access_token = JWTAuthentication.generate_access_token(user)
-        refresh_token, jti, exp_seconds = JWTAuthentication.generate_refresh_token(user)
+        instance = JWTAuthentication()
 
-        cache.set(jti, 0, exp_seconds)
+        access_token = instance.generate_access_token(user)
+        refresh_token, jti, exp_seconds = instance.generate_refresh_token(user)
 
-        return Response({"access_token": access_token, "refresh_token": refresh_token})
+        caches["default"].set(jti, user.id, exp_seconds)
+
+        publish_uo_message(user.id, f"{username} has been logged in!", "login")
+
+        return Response(
+            {_("access_token"): access_token, _("refresh_token"): refresh_token}
+        )
+
 
 class UserLogoutView(APIView):
     """
@@ -101,6 +137,8 @@ class UserLogoutView(APIView):
 
     HTTP Methods: POST
     """
+
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         """
@@ -115,11 +153,31 @@ class UserLogoutView(APIView):
         payload = request.auth
         try:
             jti = payload.get("jti")
-            cache.delete(jti)
-        except:
-            return Response({"message": "logged out before!"})
+            caches["default"].delete(jti)
+            user = request.user
+            publish_uo_message(
+                user.id, f"{user.username} has been logged out!", "log_out"
+            )
 
-        return Response({"message": "logged out successfully!"})
+        except:
+            return Response(_("logged out before!"))
+
+        return Response(_("logged out successfully!"))
+
+
+class LogoutAllSessions(APIView):
+    # permission_classes = [permissions.IsAuthenticated]
+
+    # def post(self, request):
+    #     user = request.user
+    #     keys = caches["default"].keys("*")
+    #     print(keys)
+    #     for key in keys:
+    #         if caches["default"].get(key) == user.id:
+    #             print("Key found:", key)
+    #             caches["default"].delete(key)
+    pass
+
 
 class ObtainNewAccessToken(APIView):
     """
@@ -144,24 +202,44 @@ class ObtainNewAccessToken(APIView):
         """
         refresh_token = request.POST.get("refresh").encode("utf-8")
         try:
-            payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=["HS256"])
+            payload = jwt.decode(
+                refresh_token, settings.SECRET_KEY, algorithms=["HS256"]
+            )
             jti = payload.get("jti")
         except:
-            return Response({"message": "Invalid refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(
+                {"message": "Invalid refresh token"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
-        if cache.get(jti) is None:
-            return Response({"message": "Refresh token has been expired!"}, status==status.HTTP_404_NOT_FOUND)
-        
+        if caches["default"].get(jti) is None:
+            return Response(
+                {"message": "Refresh token has been expired!"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         try:
             user_id = payload.get("user_id")
             user = User.objects.get(id=user_id)
         except:
-            return Response({"message": "User not found!"}, status==status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"message": "User not found!"}, status=status.HTTP_404_NOT_FOUND
+            )
 
-        cache.delete(jti)
+        caches["default"].delete(jti)
         instance = JWTAuthentication()
         access_token = instance.generate_access_token(user)
         refresh_token, jti, exp_seconds = instance.generate_refresh_token(user)
+        caches["default"].set(jti, user_id, exp_seconds)
+        publish_uo_message(
+            user_id, f"{user.username} has gotten new tokens!", "new_tokens"
+        )
+
+        return Response(
+            {_("access_token"): access_token, _("refresh_token"): refresh_token}
+        )
+
+
 class ChangePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -189,6 +267,7 @@ class ChangePasswordView(APIView):
                 _("Password changed successfully."), status=status.HTTP_200_OK
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class PasswordResetView(APIView):
     authentication_classes = []
@@ -222,6 +301,7 @@ class PasswordResetView(APIView):
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class PasswordResetConfirmView(APIView):
     authentication_classes = []
@@ -257,9 +337,10 @@ class PasswordResetConfirmView(APIView):
 class SpectacularSwaggerView(SpectacularSwaggerView):
     authentication_classes = []
 
+
 class SpectacularRedocView(SpectacularRedocView):
     authentication_classes = []
 
+
 class SpectacularAPIView(SpectacularAPIView):
     authentication_classes = []
-
