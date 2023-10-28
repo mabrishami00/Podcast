@@ -81,15 +81,24 @@ class SubscribeItemView(APIView):
         return Response(_("Item has been subscribed"), status=status.HTTP_201_CREATED)
 
 
-class SubscribeItemView(View):
-    def post(self, request, channel_pk, item_pk):
+class UnSubscribeItemView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, channel_pk):
+        user = request.user
         channel = Channel.objects.get(pk=channel_pk)
-        if channel.channel_type == "p":
-            item = channel.objects.filter(podcast_set__id=item_pk)
-        elif channel.channel_type == "n":
-            item = channel.objects.filter(news_set__id=item_pk)
-        Subscribe.objects.create(user=user, content_object=item)
-        return Response("Item has been subscribed", status=status.HTTP_201_CREATED)
+        if Subscribe.is_subscribed_method(user, channel):
+            subscribe = Subscribe.objects.get(user=user, channel=channel)
+            subscribe.is_subscribed = False
+            subscribe.save()
+        else:
+            return Response(
+                "You've not subscribed this item before!",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(_("Item has been unsubscribed"), status=status.HTTP_200_OK)
+
+
 
 
 class ShowSubscribeItemView(View):
