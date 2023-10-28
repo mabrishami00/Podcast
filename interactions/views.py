@@ -38,19 +38,18 @@ class UnLikeItemView(APIView):
         return delete_object(model_type, Like, user, item_pk, "liked")
 
 
-class ShowLikeItemView(View):
+class ShowLikeItemView(APIView):
     authentication_class = []
 
     def get(self, request, channel_pk, item_pk):
         user = request.user
-        channel = get_object_or_404(Channel, id=channel_pk)
-        if channel.channel_type == "p":
-            item = get_object_or_404(Podcast, id=item_pk)
-        elif channel.channel_type == "n":
-            item = get_object_or_404(News, id=item_pk)
+        model_type = get_model_type_of_channel(channel_pk, item_pk)
+        data = get_modeled_and_count_model(
+            model_type, user, Like.is_liked, Like.count_like, item_pk, "like"
+        )
+        return Response(data, status=status.HTTP_200_OK)
 
-        if user.is_authenticated():
-            liked = Like.is_liked(user, item)
+
         else:
             liked = False
 
