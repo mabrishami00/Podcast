@@ -1,11 +1,26 @@
-from django.shortcuts import render
-from .models import Like, Comment, Bookmark
+from django.db.models import Q, F
+from django.shortcuts import get_object_or_404
+from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import gettext_lazy
+
 from rss.models import Channel, Podcast, News
-from django.db.models import Q
+from .models import Like, Subscribe, Comment, Bookmark, RecommendationPodcast
+from .serializers import CommentSerializer
+from .utils import (
+    get_model_type_and_item_of_channel,
+    get_model_type_of_channel,
+    get_modeled_and_count_model,
+    get_list_model,
+    delete_object,
+    make_model,
+    update_recommendations,
+)
+
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import CommentSerializer
-from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
+from rest_framework import permissions
+
 
 # Create your views here.
 class LikeItemView(APIView):
@@ -216,3 +231,23 @@ class ShowCommentItemView(APIView):
         sr_data = CommentSerializer(instance=comments, many=True)
         return Response(sr_data.data, status=status.HTTP_200_OK)
 
+
+class UnCommentItemView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, comment_pk):
+        user = request.user
+        try:
+            Comment.objects.get(
+                id=comment_pk,
+                user=user,
+            ).delete()
+        except Exception as e:
+            return Response(
+                "This comment is not existed!", status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(
+            "Your comment has been deleted successfully!",
+            status=status.HTTP_200_OK,
+        )
