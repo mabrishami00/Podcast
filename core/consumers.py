@@ -55,3 +55,38 @@ class Consumer(ABC):
             queue=self.queue_name, on_message_callback=self.callback.callback
         )
         self.channel.start_consuming()
+
+
+class UpdateConsumerCallback(Callback):
+    def callback(self, ch, method, properties, body):
+        body_dict = json.loads(body)
+        message_type = body_dict.get("message_type")
+        channel_id = body_dict.get("activity").split(" ")[0]
+        body_dict["activity"] = f"{message_type} Task is going to be consumed!"
+        logger.info(json.dumps(body_dict))
+        channel = Channel.objects.get(id=channel_id)
+        email_operation = {
+            "update_podcast": f"{channel.title} has new episode. Check it now!",
+            "update_news": f"{channel.title} has been updated recently. Check it now!!",
+        }
+        users = Subscribe.get_all_users_subscribe_channel(channel)
+        for user in users:
+            recipient = user.email
+            subject = message_type
+            message = email_operation.get(message_type)
+            sender_email = settings.EMAIL_HOST_USER
+
+            send_mail(
+                subject,
+                message,
+                sender_email,
+                [recipient],
+                fail_silently=False,
+            )
+
+        body_dict["activity"] = f"{message_type} Task consumed successfully!"
+        logger.info(json.dumps(body_dict))
+
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+
