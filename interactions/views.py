@@ -8,7 +8,27 @@ from .serializers import CommentSerializer
 from django.shortcuts import get_object_or_404
 
 # Create your views here.
-class LikeItemView(View):
+class LikeItemView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, channel_pk, item_pk):
+        user = request.user
+        model_type, item, channel = get_model_type_and_item_of_channel(
+            channel_pk, item_pk
+        )
+        return make_model(
+            model_type,
+            Like.is_liked,
+            channel,
+            Like,
+            user,
+            item_pk,
+            item,
+            "liked",
+            update_recommendations,
+        )
+
+
     def post(self, request, channel_pk, item_pk):
         channel = Channel.objects.get(pk=channel_pk)
         if channel.channel_type == "p":
