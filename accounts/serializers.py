@@ -3,14 +3,14 @@ from .models import User
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
-    password2 = serializers.CharField()
+    password2 = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
         fields = ("username", "email", "password", "password2")
         extra_kwargs = {
             "password": {"write_only": True},
-            "password2": {"write_only": True},
+            # "password2": {"write_only": True},
         }
 
     def validate(self, data):
@@ -20,14 +20,14 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         del validated_data["password2"]
-        user = User.create_superuser(**validated_data)
+        user = User.objects.create_user(**validated_data)
         return user
-
 
 
 class UserLoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField()
+
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField()
