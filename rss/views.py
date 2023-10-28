@@ -85,6 +85,26 @@ class GetAllChannelsView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
+class GetPodcastsView(APIView):
+    authentication_classes = []
+
+    def get(self, request, *args, **kwargs):
+        searched = request.GET.get("searched")
+        if searched:
+            podcasts = Podcast.objects.filter(
+                Q(title__icontains=searched) | Q(description__icontains=searched)
+            )
+            paginator = CustomPagination()
+            paginated_queryset = paginator.paginate_queryset(podcasts, request)
+            serializer = PodcastSerializer(instance=paginated_queryset, many=True)
+            return paginator.get_paginated_response(serializer.data)
+        else:
+            return Response(
+                _("You didn't search for anything!"), status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+
     def get(self, request):
         user = request.user
         most_liked_channels = (
