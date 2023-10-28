@@ -108,26 +108,22 @@ class ShowSubscribedItemsView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
-class ShowSubscribeItemView(View):
+class ShowSubscribeItemView(APIView):
     authentication_class = []
 
-    def get(self, request, channel_pk, item_pk):
+    def get(self, request, channel_pk):
         user = request.user
         channel = get_object_or_404(Channel, id=channel_pk)
-        if channel.channel_type == "p":
-            item = get_object_or_404(Podcast, id=item_pk)
-        elif channel.channel_type == "n":
-            item = get_object_or_404(News, id=item_pk)
 
-        if user.is_authenticated():
-            subscribed = Subscribe.is_subscribed(user, item)
+        if user.is_authenticated:
+            subscribed = Subscribe.is_subscribed_method(user, channel)
         else:
             subscribed = False
 
-        subscribes_count = Subscribe.count_subscribe(item)
+        subscribes_count = Subscribe.count_subscribe(channel=channel)
         data = {"subscribed": subscribed, "subscribes_count": subscribes_count}
-        return Response(data, status=status.HTTP_200_OK)    
-    
+        return Response(data, status=status.HTTP_200_OK)
+
 
 class BookmarkItemView(View):
     def post(self, request, channel_pk, item_pk):
