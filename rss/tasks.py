@@ -64,3 +64,19 @@ def task_prerun_handler(task_id=None, task=None, **kwargs):
     body_log = body_for_logger_celery(task_name, "Task is going to be executed!")
     logger.info(json.dumps(body_log))
 
+
+@signals.task_postrun.connect
+def task_postrun_handler(task=None, state=None, retval=None, **kwargs):
+    if state == "SUCCESS":
+        task_name = task.name
+
+        body_log = body_for_logger_celery(
+            task_name, "Task successfully has been executed!"
+        )
+        logger.info(json.dumps(body_log))
+
+    else:
+        task_name = task.name
+        message = str(retval)
+        body_log = body_for_logger_celery(task_name, message)
+        logger.error(json.dumps(body_log))
