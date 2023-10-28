@@ -181,17 +181,27 @@ class ShowBookmarkedItemsView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
-class CommentItemView(View):
+class CommentItemView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def post(self, request, channel_pk, item_pk):
-        sr_data = CommentSerializer(data=request.POST)
+        sr_data = CommentSerializer(data=request.data)
         if sr_data.is_valid():
-            channel = Channel.objects.get(pk=channel_pk)
-            if channel.channel_type == "p":
-                item = channel.objects.filter(podcast_set__id=item_pk)
-            elif channel.channel_type == "n":
-                item = channel.objects.filter(news_set__id=item_pk)
-            sr_data.save(user=user, content_object=item)
-            return Response("comment has been added", status=status.HTTP_201_CREATED)
+            user = request.user
+            model_type, item, _ = get_model_type_and_item_of_channel(
+                channel_pk, item_pk
+            )
+
+            content_type = ContentType.objects.get(model=model_type)
+            Comment.objects.create(
+                user=user, body=sr_data.validated_data["body"], content_object=item
+            )
+            return Response(
+                "Your comment has been registered successfully!",
+                status=status.HTTP_201_CREATED,
+            )
+
         else:
-            return Response("comment is not valid!", status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response(_("comment is not valid!"), status=status.HTTP_400_BAD_REQUEST)
+
+
