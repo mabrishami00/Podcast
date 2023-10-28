@@ -30,3 +30,10 @@ class BaseTaskWithRetry(Task):
 def parallel_parsing(self, url, user_id):
     parser_for_rss_podcast(url, user_id)
 
+
+def update_all_channels(user_id):
+    channels = Channel.objects.all()
+    tasks_to_run = [
+        signature(parallel_parsing, args=(channel.url, user_id)) for channel in channels
+    ]
+    result = group(tasks_to_run)()
