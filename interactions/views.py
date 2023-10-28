@@ -155,23 +155,23 @@ class UnBookmarkItemView(APIView):
         return delete_object(model_type, Like, user, item_pk, "bookmark")
 
 
-class ShowBookmarkItemView(View):
+class ShowBookmarkItemView(APIView):
+    authentication_class = []
+
     def get(self, request, channel_pk, item_pk):
         user = request.user
-        channel = get_object_or_404(Channel, id=channel_pk)
-        if channel.channel_type == "p":
-            item = get_object_or_404(Podcast, id=item_pk)
-        elif channel.channel_type == "n":
-            item = get_object_or_404(News, id=item_pk)
+        model_type = get_model_type_of_channel(channel_pk, item_pk)
+        data = get_modeled_and_count_model(
+            model_type,
+            user,
+            Bookmark.is_bookmarked,
+            Bookmark.count_bookmark,
+            item_pk,
+            "bookmark",
+        )
+        return Response(data, status=status.HTTP_200_OK)
 
-        if user.is_authenticated():
-            bookmarked = Bookmark.is_bookmarked(user, item)
-        else:
-            bookmarked = False
 
-        bookmarks_count = Bookmark.count_like(item)
-        data = {"bookmarked": bookmarked, "bookmarks_count": bookmarks_count}
-        return Response(data, status=status.HTTP_200_OK)    
 
 class CommentItemView(View):
     def post(self, request, channel_pk, item_pk):
