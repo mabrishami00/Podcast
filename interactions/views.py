@@ -125,7 +125,26 @@ class ShowSubscribeItemView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
-class BookmarkItemView(View):
+class BookmarkItemView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, channel_pk, item_pk):
+        user = request.user
+        model_type, item, channel = get_model_type_and_item_of_channel(
+            channel_pk, item_pk
+        )
+
+        return make_model(
+            model_type,
+            Bookmark.is_bookmarked,
+            channel,
+            Bookmark,
+            user,
+            item_pk,
+            item,
+            "bookmarked",
+        )
+
     def post(self, request, channel_pk, item_pk):
         channel = Channel.objects.get(pk=channel_pk)
         if channel.channel_type == "p":
