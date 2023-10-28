@@ -37,3 +37,14 @@ def update_all_channels(user_id):
         signature(parallel_parsing, args=(channel.url, user_id)) for channel in channels
     ]
     result = group(tasks_to_run)()
+
+
+@signals.before_task_publish.connect
+def task_before_publish_handler(
+    sender=None, headers=None, body=None, exchange=None, routing_key=None, **kwargs
+):
+    print("start before publish")
+    body_log = body_for_logger_celery(body[0][0], "Task is going to be published!")
+    logger.info(json.dumps(body_log))
+    print("end before publish")
+
