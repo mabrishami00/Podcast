@@ -50,6 +50,15 @@ class ShowLikeItemView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
+class ShowLikedItemsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        data = get_list_model(Like.list_like, user, "like")
+        return Response(data, status=status.HTTP_200_OK)
+
+
         else:
             liked = False
 
