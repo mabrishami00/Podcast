@@ -190,6 +190,39 @@ class ChangePasswordView(APIView):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class PasswordResetView(APIView):
+    authentication_classes = []
+    serializer_class = PasswordResetSerializer
+
+    def post(self, request, *args, **kwargs):
+        sr_data = self.serializer_class(data=request.data)
+        if sr_data.is_valid():
+            email = sr_data.validated_data["email"]
+            try:
+                user = User.objects.get(email=email)
+            except:
+                return Response(_("User not found"), status=status.HTTP_404_NOT_FOUND)
+
+            token = default_token_generator.make_token(user)
+            uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+            reset_url = (
+                f"{settings.HOST}/accounts/password-reset/confirm/{uidb64}/{token}/"
+            )
+
+            recipient_list = [user.email]
+            subject = "reset password"
+            message = (
+                f"You have requested for password reset. Go to this link: {reset_url}."
+            )
+
+            sending_email(recipient_list, subject, message)
+
+            return Response(
+                _("Password reset email has been sent!"), status=status.HTTP_200_OK
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class SpectacularSwaggerView(SpectacularSwaggerView):
     authentication_classes = []
