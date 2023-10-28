@@ -4,8 +4,12 @@ from rss.models import Channel, Podcast, Category, News
 from datetime import datetime
 from django.db import transaction
 from .exceptions import NotValidXML
+from core.publishers import NotificationPublisher
+from django.conf import settings
+from core.utils import publish_update_message
 
-def parser_for_rss_podcast(feed):
+
+def parser_for_rss_podcast(feed, user_id):
     namespaces = {
         "itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd",
         "media": "http://search.yahoo.com/mrss/",
@@ -24,10 +28,10 @@ def parser_for_rss_podcast(feed):
         if channel_type == "n"
         else parse_podcasts(channel, namespaces)
     )
-    create_channel_and_podcasts(channel_category, channel_info, items_info)
+    create_channel_and_podcasts(channel_category, channel_info, items_info, user_id)
 
 
-def create_channel_and_podcasts(channel_category, channel_info, items_info):
+def create_channel_and_podcasts(channel_category, channel_info, items_info, user_id):
     categories = []
     existed_categories = []
 
@@ -49,24 +53,46 @@ def create_channel_and_podcasts(channel_category, channel_info, items_info):
     except:
         condition = False
 
-    if created or condition:
+    if created or condition or True:
         if channel_info["channel_type"] == "p":
-            print("if podcast")
-            podcasts = [
-                Podcast(**item, channel=channel)
-                for item in items_info
-                if not Podcast.objects.filter(guid=item.get("guid")).exists()
-            ]
+            # podcasts = [
+            #     Podcast(**item, channel=channel)
+            #     for item in items_info
+            #     if not Podcast.objects.filter(guid=item.get("guid")).exists()
+            # ]
+            podcasts = []
+            update = False
+            for item in items_info:
+                if not Podcast.objects.filter(guid=item.get("guid")).exists():
+                    podcasts.append(Podcast(**item, channel=channel))
+                    update = True
+                else:
+                    break
+
             Podcast.objects.bulk_create(podcasts)
+            if update:
+                publish_update_message(
+                    user_id, f"{channel.id} is going to be updated!", "update_podcast"
+                )
 
         elif channel_info["channel_type"] == "n":
-            print("if news")
-            news = [
-                News(**item, channel=channel)
-                for item in items_info
-                if not News.objects.filter(guid=item.get("guid")).exists()
-            ]
+            # news = [
+            #     News(**item, channel=channel)
+            #     for item in items_info
+            #     if not News.objects.filter(guid=item.get("guid")).exists()
+            # ]
+            podcasts = []
+            update = False
+            for item in items_info:
+                if not News.objects.filter(guid=item.get("guid")).exists():
+                    podcasts.append(News(**item, channel=channel))
+                    update = True
+                else:
+                    break
             News.objects.bulk_create(news)
+            publish_update_message(
+                user_id, f"{channel.id} is going to be updated!", "update_news"
+            )
 
 
 def parse_channel(channel, namespaces):
