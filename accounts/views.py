@@ -162,8 +162,34 @@ class ObtainNewAccessToken(APIView):
         instance = JWTAuthentication()
         access_token = instance.generate_access_token(user)
         refresh_token, jti, exp_seconds = instance.generate_refresh_token(user)
-        cache.set(jti, 0, exp_seconds)
-        return Response({"access_token": access_token, "refresh_token": refresh_token})
+class ChangePasswordView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        sr_data = ChangePasswordSerializer(data=request.POST)
+
+        if sr_data.is_valid():
+            old_password = sr_data.validated_data.get("old_password")
+            new_password = sr_data.validated_data.get("new_password")
+
+            if not user.check_password(old_password):
+                return Response(
+                    "Invalid old password.", status=status.HTTP_400_BAD_REQUEST
+                )
+
+            user.set_password(new_password)
+            user.save()
+
+            publish_uo_message(
+                user.id, f"{user.username} has changed the password!", "change_password"
+            )
+
+            return Response(
+                _("Password changed successfully."), status=status.HTTP_200_OK
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class SpectacularSwaggerView(SpectacularSwaggerView):
     authentication_classes = []
