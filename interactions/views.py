@@ -29,14 +29,13 @@ class LikeItemView(APIView):
         )
 
 
+class UnLikeItemView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def post(self, request, channel_pk, item_pk):
-        channel = Channel.objects.get(pk=channel_pk)
-        if channel.channel_type == "p":
-            item = channel.objects.filter(podcast_set__id=item_pk)
-        elif channel.channel_type == "n":
-            item = channel.objects.filter(news_set__id=item_pk)
-        Like.objects.create(user=user, content_object=item)
-        return Response("Item has been liked", status=status.HTTP_201_CREATED)
+        user = request.user
+        model_type = get_model_type_of_channel(channel_pk, item_pk)
+        return delete_object(model_type, Like, user, item_pk, "liked")
 
 
 class ShowLikeItemView(View):
