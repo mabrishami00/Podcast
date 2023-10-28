@@ -59,13 +59,27 @@ class ShowLikedItemsView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
-        else:
-            liked = False
+class SubscribeItemView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
-        likes_count = Like.count_like(item)
-        data = {"liked": liked, "likes_count": likes_count}
-        return Response(data, status=status.HTTP_200_OK)    
-    
+    def post(self, request, channel_pk):
+        user = request.user
+        channel = Channel.objects.get(pk=channel_pk)
+        if not Subscribe.is_subscribed_method(user, channel):
+            subscribe_list = Subscribe.objects.filter(user=user, channel=channel)
+            if subscribe_list.exists():
+                subscribe = subscribe_list.last()
+                subscribe.is_subscribed = True
+                subscribe.save()
+            else:
+                Subscribe.objects.create(user=user, channel=channel)
+        else:
+            return Response(
+                "You've subscribed this item before!",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(_("Item has been subscribed"), status=status.HTTP_201_CREATED)
+
 
 class SubscribeItemView(View):
     def post(self, request, channel_pk, item_pk):
