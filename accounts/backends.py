@@ -3,9 +3,10 @@ import jwt
 from django.conf import settings
 import datetime
 import uuid
-from django.core.cache import cache
+from django.core.cache import caches
 from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from .models import User
+import pytz
 
 
 class JWTAuthentication(authentication.BaseAuthentication):
@@ -13,7 +14,10 @@ class JWTAuthentication(authentication.BaseAuthentication):
 
     def authenticate(self, request, username=None, password=None):
         authorization_header = request.headers.get("Authorization")
-        jwt_token = JWTAuthentication.get_token_form_header(authorization_header)
+        try:
+            jwt_token = JWTAuthentication.get_token_form_header(authorization_header)
+        except:
+            raise AuthenticationFailed("You are not logged in!")
 
         if jwt_token is None:
             return None
@@ -23,8 +27,8 @@ class JWTAuthentication(authentication.BaseAuthentication):
         except jwt.exceptions.InvalidSignatureError:
             raise AuthenticationFailed("Invalid signature")
         except jwt.exceptions.ExpiredSignatureError:
-            raise NotAuthenticated('Access Token Expired')
-        except:
+            raise NotAuthenticated("Access Token Expired")
+        except Exception as e:
             raise AuthenticationFailed("Invalid token")
 
         user_id = payload.get("user_id")
@@ -33,7 +37,7 @@ class JWTAuthentication(authentication.BaseAuthentication):
         if user_id is None:
             raise AuthenticationFailed("User identifier not found in JWT")
 
-        if cache.get(jti) is None:
+        if caches["default"].get(jti) is None:
             return None
 
         user = User.objects.filter(id=user_id).first()
@@ -42,28 +46,28 @@ class JWTAuthentication(authentication.BaseAuthentication):
             raise AuthenticationFailed("User not found")
 
         return user, payload
-    @classmethod
-    def generate_access_token(cls, user):
+
+    def generate_access_token(self, user):
         access_token_payload = {
             "user_id": user.id,
-            "exp": datetime.datetime.now() + datetime.timedelta(days=0, minutes=5),
-            "iat": datetime.datetime.now(),
-            "jti": cls.jti,
+            "exp": datetime.datetime.now(tz=pytz.timezone("Asia/Tehran"))
+            + datetime.timedelta(days=1),
+            "iat": datetime.datetime.now(tz=pytz.timezone("Asia/Tehran")),
+            "jti": self.jti,
         }
         access_token = jwt.encode(
             access_token_payload, settings.SECRET_KEY, algorithm="HS256"
         )
         return access_token
 
-    @classmethod
-    def generate_refresh_token(cls, user):
+    def generate_refresh_token(self, user):
         exp = datetime.timedelta(days=7)
 
         refresh_token_payload = {
             "user_id": user.id,
-            "exp": datetime.datetime.now() + exp,
-            "iat": datetime.datetime.now(),
-            "jti": cls.jti,
+            "exp": datetime.datetime.now(tz=pytz.timezone("Asia/Tehran")) + exp,
+            "iat": datetime.datetime.now(tz=pytz.timezone("Asia/Tehran")),
+            "jti": self.jti,
         }
         refresh_token = jwt.encode(
             refresh_token_payload, settings.SECRET_KEY, algorithm="HS256"

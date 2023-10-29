@@ -1,0 +1,175 @@
+services:
+  django:
+    build: .
+    container_name: django
+    env_file:
+      - .env
+    command: sh -c "python manage.py makemigrations && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    ports: 
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+      - elasticsearch
+    networks:
+      - main
+    restart: always
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_DB: $DB_NAME
+      POSTGRES_USER: $DB_USER
+      POSTGRES_PASSWORD: $DB_PASSWORD
+    ports:
+      - "$DB_PORT:$DB_PORT"
+    networks:
+      - main
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+  
+  redis:
+    image: redis:6
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - main
+    restart: always
+
+  celery_worker:
+    build: .
+    container_name: celery_worker
+    env_file:
+      - .env
+    command: celery -A config worker --loglevel=info
+    depends_on:
+      - django
+    volumes:
+      - .:/app
+    networks:
+      - main
+    restart: always
+
+  celery_beat:
+    build: .
+    container_name: celery_beat
+    env_file:
+      - .env
+    command: celery -A config beat -l info
+    volumes:
+      - .:/app
+    depends_on:
+      - django
+    networks:
+      - main
+    restart: always
+
+  elasticsearch:
+    container_name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.4
+    environment: 
+    - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    - "cluster.name=elasticsearch_cluster"
+    - "node.name=elasticsearch"
+    - "bootstrap.memory_lock=true"
+    - "network.host=0.0.0.0"
+    - "logger.level=info"
+    - "discovery.type=single-node"
+    - "xpack.security.enabled=false"
+    
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - main
+    restart: always
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.4
+    container_name: kibana
+    ports:
+      - 5601:5601
+    volumes:
+      - kibana_data:/usr/share/kibana/data
+    networks:
+      - main
+    restart: always
+
+  rabbitmq:
+    container_name: "rabbitmq"
+    image: rabbitmq:3.10.25-management-alpine
+    ports:
+      - 5672:5672
+      - 15672:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - main
+    restart: always
+
+  flower:
+    container_name: flower
+    build: .
+    command: celery -A config flower
+    ports:
+      - 5555:5555
+    depends_on:
+      - rabbitmq
+      - celery_worker
+      - celery_beat
+    volumes:
+      - flower_data:/flower_data
+    env_file:
+      - .env
+    networks:
+      - main
+    restart: always
+
+  update_notif_consumer:
+    build: .
+    container_name: "update_notif_consumer"
+    env_file:
+      - .env
+    command: sh -c "sleep 20 && python manage.py update_consumer"
+    depends_on:
+      - django
+    volumes:
+      - .:/app
+    networks:
+      - main
+    restart: always
+
+  user_operations_notif_consumer:
+    build: .
+    container_name: "user_operations_notif_consumer"
+    env_file:
+      - .env
+    command: sh -c "sleep 20 && python manage.py user_operations_consumer"
+    depends_on:
+      - django
+    volumes:
+      - .:/app
+    networks:
+      - main
+    restart: always
+
+volumes:
+  postgres_data:
+  redis_data:
+  elasticsearch_data:
+  kibana_data:
+  flower_data:
+
+networks:
+  main:
+    driver: bridge 
